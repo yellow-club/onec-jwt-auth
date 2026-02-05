@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  default.vrd — публикация AUTH (выдача JWT по PAT/Basic)
+
+  Назначение:
+  - публикуем только сервис выдачи токена: POST /hs/auth/token
+  - JWT на периметре НЕ включаем (иначе получится «токен нужен, чтобы получить токен»)
+
+  Как применить:
+  1) Создайте отдельную веб‑публикацию ИБ (например, виртуальная директория /auth).
+  2) Скопируйте этот файл в папку публикации и назовите его ровно: default.vrd
+  3) Заполните TODO:IB (путь к базе/строка соединения).
+
+  Подсказка по IB:
+    • файловая ИБ:
+        ib="File=&quot;C:\Bases\MyBase&quot;;"
+    • серверная ИБ:
+        ib="Srvr=&quot;localhost&quot;;Ref=&quot;MyBase&quot;;"
+-->
+<point xmlns="http://v8.1c.ru/8.2/virtual-resource-system"
+       xmlns:xs="http://www.w3.org/2001/XMLSchema"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       base="/"
+       ib="File=&quot;C:\Path\To\Infobase&quot;;"  <!-- TODO:IB -->
+       enable="true">
+
+  <debug enable="false"
+         protocol="tcp"
+         url="tcp://HOST:1560"/>
+
+  <ws enable="false"
+      pointEnableCommon="false"/>
+
+  <!-- Публикуем только сервис аутентификации -->
+  <httpServices publishByDefault="false">
+    <service name="СервисАутентификации"
+             rootUrl="auth"
+             enable="true"
+             reuseSessions="autouse"
+             sessionMaxAge="20"
+             poolSize="10"
+             poolTimeout="5" />
+  </httpServices>
+
+  <standardOdata enable="false"
+                 reuseSessions="autouse"
+                 sessionMaxAge="20"
+                 poolSize="10"
+                 poolTimeout="5"/>
+
+  <analytics enable="false"
+             sessionMaxAge="1200"
+             poolSize="500"
+             poolTimeout="5"/>
+</point>

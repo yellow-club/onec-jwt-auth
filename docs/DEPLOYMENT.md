@@ -44,63 +44,63 @@ openssl pkey -in jwt_private.pem -pubout -out jwt_public.pem
 
 Цель: разрешить `POST /hs/auth/token` по PAT/Basic.
 
-- Публикуете ИБ на веб‑сервере как обычно
-- В `default.vrd` **НЕ добавляете** `<accessTokenAuthentication>` для HTTP-сервисов
+Что делать:
+
+1) Создайте **отдельную** веб‑публикацию для выдачи токена (например, `/auth`).
+2) Возьмите файл `deploy/vrd/auth.default.vrd.example`, скопируйте в папку публикации и переименуйте в **`default.vrd`**.
+3) Внутри `default.vrd` заполните `TODO:IB` (путь к базе / строка соединения).
+
+Важно:
+- В AUTH‑публикации **не должно быть** `<accessTokenAuthentication>` — иначе получится «токен нужен, чтобы получить токен».
+- PAT/Basic проверяются логикой конфигурации, без участия `default.vrd`.
 
 Рекомендации:
-- ограничьте доступ к публикации (IP allowlist, VPN, внутренний контур)
+- ограничьте доступ к публикации (VPN / IP allowlist / внутренний контур)
 - включите HTTPS
+
 
 ---
 
 ## 2) Публикация API (боевые эндпойнты, Bearer JWT)
 
-Цель: закрыть HTTP-сервисы JWT аутентификацией на периметре.
+Цель: закрыть боевые HTTP‑сервисы JWT аутентификацией на периметре (проверка подписи/iss/aud/exp до входа в код 1С).
 
-### Пример фрагмента `default.vrd`
+Что делать:
 
-Согласно админ‑гайду, `<accessTokenAuthentication>` может быть подчинён `<httpServices>` — тогда JWT будет применяться только к HTTP‑сервисам.
+1) Создайте **отдельную** веб‑публикацию для боевого API (например, `/api`).
+2) Возьмите файл `deploy/vrd/api.default.vrd.example`, скопируйте в папку публикации и переименуйте в **`default.vrd`**.
+3) Заполните в нём:
+   - `TODO:IB` — путь к базе / строка соединения
+   - `TODO:AUD` — то, что ожидаете в claim `aud`
+   - `TODO:ISS` — то, что ожидаете в claim `iss`
+   - `PUBLIC KEY` в `issuer/@keyInformation` — содержимое `jwt_public.pem`
 
-```xml
-<httpServices enable="true">
-  <!-- ... ваши сервисы ... -->
+По умолчанию этот проект рассчитан на технического пользователя:
+- `sub` в JWT содержит имя пользователя (например, `jwt_service`)
+- в ИБ должен существовать пользователь с `Name = jwt_service`
+  (это следует из `authenticationClaimName="sub"` и `authenticationUserPropertyName="name"` в VRD)
 
-  <accessTokenAuthentication>
-    <!-- aud, который ожидает платформа -->
-    <accessTokenRecepientName>api_service</accessTokenRecepientName>
+> Если вы добавляете новые HTTP‑сервисы — перечисляйте их отдельными `<service ...>` внутри `<httpServices>`.
 
-    <issuers>
-      <issuer
-        name="limitedAccess"
-        authenticationClaimName="sub"
-        authenticationUserPropertyName="name"
-        keyInformation="-----BEGIN PUBLIC KEY-----...-----END PUBLIC KEY-----"
-      />
-    </issuers>
-  </accessTokenAuthentication>
-</httpServices>
-```
-
-Что означает этот конфиг:
-- `accessTokenRecepientName` сравнивается с `aud` в payload.
-- `issuer/@name` сравнивается с `iss` в payload.
-- `authenticationClaimName` (по умолчанию `sub`) — какое поле токена использовать для поиска пользователя.
-- `authenticationUserPropertyName="name"` — искать 1С‑пользователя по его `Name`.
-
-> Важно: в примере `keyInformation` указан одной строкой. На практике удобнее хранить PEM без переносов строк или с XML‑экранированием переносов.
 
 ---
 
-## 3) Сопоставление с конфигурацией
+## 3) Что должно совпасть: конфигурация ↔ default.vrd
 
-В конфигурации значения по умолчанию такие:
-- `iss` = `limitedAccess`
-- `aud` содержит `api_service`
-- `sub` = `jwt_service` (технический пользователь публикации)
+Платформа сверяет поля JWT с настройками публикации:
 
-Если вы меняете эти значения — делайте это **согласованно**:
-- `ПолитикаJWT` (в конфигурации)
-- `default.vrd` (в публикации API)
+- `aud` (в payload) ↔ `<accessTokenRecepientName>`
+- `iss` (в payload) ↔ `issuer/@name`
+- `sub` (в payload) ↔ пользователь ИБ, если используете
+  `authenticationClaimName="sub"` + `authenticationUserPropertyName="name"`
+
+Также публичный ключ в `default.vrd` (API‑публикация) должен соответствовать private key,
+который используется для подписи JWT в конфигурации (загружается через обработку **«Тестирование» → «Добавить секретный ключ»**).
+
+Если вы меняете `aud/iss/sub` — делайте это **согласованно**:
+- в конфигурации (политика/константы, которые формируют JWT)
+- в `default.vrd` (API‑публикация)
+
 
 ---
 

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  default.vrd — публикация API (боевые эндпойнты, JWT на периметре)
+
+  Зачем:
+  - публикуем ТОЛЬКО боевые HTTP-сервисы (например, /hs/chats/*)
+  - платформа 1С проверяет Bearer JWT *до* входа в обработчик HTTP-сервиса:
+      • подпись RS256 (по публичному ключу)
+      • iss (issuer)
+      • aud (audience)
+      • exp (срок действия)
+
+  Как применить:
+  1) Создайте отдельную веб‑публикацию ИБ (например, виртуальная директория /api).
+  2) Скопируйте этот файл в папку публикации и назовите его ровно: default.vrd
+  3) Заполните TODO-поля ниже (IB/AUD/ISS/PUBLIC_KEY).
+  4) Перезапустите публикацию (или пул приложения), если это требуется вашим окружением.
+
+  Важно:
+  - Технический пользователь: токены в этом проекте рассчитаны на sub=jwt_service.
+    В ИБ должен существовать пользователь с Name = jwt_service (или измените sub/маппинг согласованно).
+  - Публичный ключ: сюда вставляется PUBLIC key (jwt_public.pem), соответствующий private key,
+    который вы загрузили в ИБ через обработку «Тестирование» → «Добавить секретный ключ».
+
+  Подсказка по IB:
+    • файловая ИБ:
+        ib="File=&quot;C:\Bases\MyBase&quot;;"
+    • серверная ИБ:
+        ib="Srvr=&quot;localhost&quot;;Ref=&quot;MyBase&quot;;"
+-->
+<point xmlns="http://v8.1c.ru/8.2/virtual-resource-system"
+       xmlns:xs="http://www.w3.org/2001/XMLSchema"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       base="/"
+       ib="File=&quot;C:\Path\To\Infobase&quot;;"  <!-- TODO:IB -->
+       enable="true">
+
+  <!-- Отладка (опционально). Обычно в проде держим disable. -->
+  <debug enable="false"
+         protocol="tcp"
+         url="tcp://HOST:1560"/>
+
+  <ws enable="false"
+      pointEnableCommon="false"/>
+
+  <!-- Публикуем только то, что перечислено ниже -->
+  <httpServices publishByDefault="false">
+    <service name="Чаты"
+             rootUrl="chats"
+             enable="true"
+             reuseSessions="autouse"
+             sessionMaxAge="20"
+             poolSize="10"
+             poolTimeout="5">
+
+      <!-- JWT включаем только для этой публикации -->
+      <accessTokenAuthentication>
+        <!-- TODO:AUD — значение должно совпадать с claim aud в JWT -->
+        <accessTokenRecepientName>your-audience</accessTokenRecepientName>
+
+        <issuers>
+          <!--
+            TODO:ISS — значение должно совпадать с claim iss в JWT.
+            authenticationClaimName="sub" + authenticationUserPropertyName="name":
+              берём sub из токена и ищем пользователя по свойству Name.
+          -->
+          <issuer name="your-issuer"
+                  authenticationClaimName="sub"
+                  authenticationUserPropertyName="name"
+                  keyInformation="-----BEGIN PUBLIC KEY-----
+PASTE_YOUR_PUBLIC_KEY_HERE
+-----END PUBLIC KEY-----"/>
+        </issuers>
+      </accessTokenAuthentication>
+    </service>
+
+    <!-- Если добавите ещё HTTP-сервисы — перечисляйте их здесь отдельными <service ...> -->
+  </httpServices>
+
+  <!-- Остальное выключено — чтобы VRD был понятнее и без неожиданностей -->
+  <standardOdata enable="false"
+                 reuseSessions="autouse"
+                 sessionMaxAge="20"
+                 poolSize="10"
+                 poolTimeout="5"/>
+
+  <analytics enable="false"
+             sessionMaxAge="1200"
+             poolSize="500"
+             poolTimeout="5"/>
+</point>
